@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // TypeScript interface for the Booking document
 export interface IBooking extends Document {
@@ -14,12 +14,12 @@ const BookingSchema = new Schema<IBooking>(
   {
     eventId: {
       type: Schema.Types.ObjectId,
-      ref: 'Event',
-      required: [true, 'Event ID is required'],
+      ref: "Event",
+      required: [true, "Event ID is required"],
     },
     email: {
       type: String,
-      required: [true, 'Email is required'],
+      required: [true, "Email is required"],
       trim: true,
       lowercase: true,
       validate: {
@@ -27,26 +27,26 @@ const BookingSchema = new Schema<IBooking>(
           // RFC 5322 compliant email regex
           return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
         },
-        message: 'Please provide a valid email address',
+        message: "Please provide a valid email address",
       },
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Pre-save hook: Verify that referenced eventId exists in the Event collection
-BookingSchema.pre('save', async function (next) {
+BookingSchema.pre("save", async function (next) {
   // Only validate eventId if it's new or modified
-  if (this.isNew || this.isModified('eventId')) {
+  if (this.isNew || this.isModified("eventId")) {
     try {
       // Dynamically import Event model to avoid circular dependency
-      const Event = models.Event || (await import('./event.model')).default;
-      
+      const Event = models.Event || (await import("./event.model")).default;
+
       // Check if the event exists
       const eventExists = await Event.exists({ _id: this.eventId });
-      
+
       if (!eventExists) {
         throw new Error(`Event with ID ${this.eventId} does not exist`);
       }
@@ -54,14 +54,20 @@ BookingSchema.pre('save', async function (next) {
       return next(error as Error);
     }
   }
-  
+
   next();
 });
 
 // Index on eventId for efficient queries when fetching bookings for a specific event
 BookingSchema.index({ eventId: 1 });
 
+//Create compund index on eventId and email to prevent duplicate bookings for the same event by the same email
+BookingSchema.index({ eventId: 1, email: 1 }, { unique: true });
+
+//create index on email for efficient queries when fetching bookings by email
+BookingSchema.index({ email: 1 });
+
 // Prevent model recompilation in development (Next.js hot reload)
-const Booking = models.Booking || model<IBooking>('Booking', BookingSchema);
+const Booking = models.Booking || model<IBooking>("Booking", BookingSchema);
 
 export default Booking;
